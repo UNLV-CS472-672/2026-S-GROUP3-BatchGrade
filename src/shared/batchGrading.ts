@@ -6,7 +6,7 @@
  * and judge results when processing multiple students sequentially.
  */
 
-import type { CompileCppResult, JudgeCppResult } from './compiler'
+import type { DockerCompileResult, DockerJudgeResult } from './compiler'
 
 /**
  * BatchGradingStatus
@@ -31,7 +31,7 @@ export type BatchJudgeCaseResult = {
   testNumber: number
   inputFile: string | null
   outputFile: string
-  result: JudgeCppResult
+  result: DockerJudgeResult
 }
 
 /**
@@ -54,7 +54,7 @@ export type BatchStudentSubmission = {
   status: BatchGradingStatus
 
   // Compilation result
-  compileResult: CompileCppResult | null
+  compileResult: DockerCompileResult | null
 
   // Judge results
   judgeResults: BatchJudgeCaseResult[]

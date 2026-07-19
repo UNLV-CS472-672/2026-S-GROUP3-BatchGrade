@@ -1,4 +1,4 @@
-import type { CompileCppResult } from './compiler'
+import type { DockerCompileResult } from './compiler'
 
 export type SubmissionSelfCheckSummary = {
   score: number
@@ -9,7 +9,7 @@ export type SubmissionSelfCheckSummary = {
 }
 
 export type SubmissionCompileSnapshot = Pick<
-  CompileCppResult,
+  DockerCompileResult,
   'compileSuccess' | 'compilerPath' | 'sourceFiles' | 'stdout' | 'stderr' | 'message'
 >
 

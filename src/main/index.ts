@@ -32,76 +32,11 @@ import {
   materializeServerSubmissions
 } from './utils/file'
 
-// @ Issue 9: Implement Automated Build & Compilation
-import { detectGccInstallation, validateGccPath } from './compiler/gccDetection'
 import { detectDockerInstallation } from './compiler/dockerDetection'
-import type { GccInstallationInfo, SupportedPlatform } from '../shared/compiler'
 
-import { compileCppFiles } from './compiler/compileCppFiles'
-import { executeCppFiles } from './compiler/executeCppFiles'
-import { judgeCppFiles } from './compiler/judgeCppFiles'
 import { submitCppSubmission } from './submissions/submitCppSubmission'
 import { dockerCompile } from './compiler/dockerCompile'
 import { dockerJudge } from './compiler/dockerJudge'
-
-let gccStatusPromise: Promise<GccInstallationInfo> | undefined
-let manualGccPath: string | null = null
-/*
-  Need this helper function in case a user changes compiler settings or a compile step needs to revalidate the path
-*/
-function refreshGccStatus(): Promise<GccInstallationInfo> {
-  gccStatusPromise = detectGccInstallation()
-  return gccStatusPromise
-}
-
-function getSupportedPlatform(): SupportedPlatform {
-  let platform: SupportedPlatform = 'unknown'
-
-  if (process.platform === 'win32') {
-    platform = 'win32'
-  }
-  if (process.platform === 'darwin') {
-    platform = 'darwin'
-  }
-  if (process.platform === 'linux') {
-    platform = 'linux'
-  }
-
-  return platform
-}
-
-/*
-  @ Issue 9: If compilation fails unexpectedly due to compiler not found, revalidate the location/prompt to install
-  Scenario:
-    - GCC may be detected at startup
-    - Later on, the user uninstalls it, moves it, or the manual path is wrong
-    - Compile is attempted with path the app thought was valid
-  Why it's needed:
-    - Without revalidation, the app may only show a vague compile failure
-    - User then cannot tell whether their code is bad or the compiler is missing
-  Shouldn't trigger on:
-    - syntax errors
-    - linker errors
-    - missing student headers
-    - undefined references
-    - bad student code
-*/
-function isCompilerNotFoundError(stderr: string, message: string): boolean {
-  // ai-gen start (GPT-5.4, 1)
-  // Prompt: https://chatgpt.com/share/69bb0b9d-e314-800e-8e15-cacc4b61f4e5
-  const text = `${stderr}\n${message}`.toLowerCase()
-
-  return (
-    text.includes('no such file or directory') ||
-    text.includes('cannot find the file') ||
-    text.includes('command not found') ||
-    text.includes('not recognized as an internal or external command') ||
-    text.includes('spawn') ||
-    text.includes('enoent')
-  )
-
-  // ai-gen end
-}
 
 function createWindow(): void {
   // Create the browser window.
@@ -156,9 +91,6 @@ app.whenReady().then(() => {
     // IPC test
     ipcMain.on('ping', () => console.log('pong'))
 
-    // Detect GCC during startup
-    refreshGccStatus() // For renderers (Front-end developers): Use this to query a ready-made status object.
-
     // Users CRUD
     ipcMain.handle('users:getAll', () => getAllUsers())
     ipcMain.handle('users:create', (_e, data: NewUser) => createUser(data))
@@ -212,48 +144,6 @@ app.whenReady().then(() => {
       replaceAssignmentTestCases(assignmentUuid, testCases)
     )
 
-    // Compiler Status
-    ipcMain.handle('compiler:getGccStatus', async () => gccStatusPromise ?? refreshGccStatus())
-
-    // Validate the manual compiler path from the UI and make it the current GCC selection
-    ipcMain.handle('compiler:setGccPath', async (_e, filePath: string) => {
-      if (!(await validateGccPath(filePath))) {
-        manualGccPath = null
-
-        const missingRes: GccInstallationInfo = {
-          compilerId: 'gcc',
-          status: 'missing',
-          platform: getSupportedPlatform(),
-          message: 'The selected path is invalid. Use a C++ compiler such as g++, c++, or clang++.',
-          installInstruction: null, // the user is prompted to install with instructions for their OS if they don't have a compiler installed
-          path: null,
-          source: null // User can manually set the path to a GCC installation
-        }
-
-        // Keep the cached compiler status in sync with what the UI shows.
-        // Without this, compile could still use an older valid compiler path.
-        gccStatusPromise = Promise.resolve(missingRes)
-
-        return missingRes
-      } else {
-        manualGccPath = filePath
-
-        const manualRes: GccInstallationInfo = {
-          compilerId: 'gcc',
-          status: 'ready',
-          platform: getSupportedPlatform(),
-          message: 'Manual GCC path has been saved successfully.',
-          installInstruction: null,
-          path: manualGccPath,
-          source: 'manual'
-        }
-
-        gccStatusPromise = Promise.resolve(manualRes)
-
-        return manualRes
-      }
-    })
-
     // Docker Detection
     ipcMain.handle('compiler:getDockerStatus', () => detectDockerInstallation())
 
@@ -266,57 +156,6 @@ app.whenReady().then(() => {
     ipcMain.handle('file:materializeServerSubmissions', (_e, bundles) =>
       materializeServerSubmissions(bundles)
     )
-
-    // Compilation
-    ipcMain.handle('compiler:compileCpp', async (_e, request) => {
-      const gccStatus = await (gccStatusPromise ?? refreshGccStatus())
-
-      if (gccStatus.status != 'ready' || !gccStatus.path) {
-        return {
-          compileSuccess: false,
-          compilerPath: null,
-          executablePath: null,
-          sourceFiles: request.sourceFiles,
-          stdout: '',
-          stderr: '',
-          message: 'GCC is not configured yet. Configure GCC before compiling.'
-        }
-      }
-
-      // Revalidate Compiler
-      const compileRes = await compileCppFiles(gccStatus.path, request)
-      if (compileRes.compileSuccess) {
-        return compileRes
-      }
-
-      // Only revalidate GCC if the failure looks like the compiler itself is missing or cannot be started
-      const isCompilerMissing = isCompilerNotFoundError(compileRes.stderr, compileRes.message)
-      if (!isCompilerMissing) {
-        return compileRes
-      }
-
-      // If GCC is still missing, return an error so the UI can guide the user back to compiler setup or installation
-      const refreshedStatus = await refreshGccStatus()
-      if (refreshedStatus.status !== 'ready' || !refreshedStatus.path) {
-        return {
-          ...compileRes,
-          compilerPath: null,
-          executablePath: null,
-          message: 'Compiler path is no longer valid. GCC was rechecked and not found.',
-          stderr: `${compileRes.stderr}\n\nBatchGrade revalidated the compiler path and could not find GCC.`
-        }
-      }
-      return compileCppFiles(refreshedStatus.path, request)
-    })
-
-    // Execution
-    ipcMain.handle('compiler:runCompiledProgram', (_e, request) => {
-      return executeCppFiles(request)
-    })
-
-    ipcMain.handle('compiler:judgeCpp', (_e, request) => {
-      return judgeCppFiles(request)
-    })
 
     // Docker Compilation
     ipcMain.handle('compiler:dockerCompileCpp', async (_e, sourceFiles: string[]) => {
