@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const { spawnMock, rmSyncMock } = vi.hoisted(() => {
   return {
@@ -49,8 +49,13 @@ function restorePlatform(): void {
 }
 
 beforeEach(() => {
+  vi.spyOn(process, 'once').mockImplementation(() => process)
   spawnMock.mockReset()
   rmSyncMock.mockReset()
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('dockerExecute', () => {
@@ -88,6 +93,9 @@ describe('dockerExecute', () => {
     expect(result.message).toBe('Program execution success.')
     expect(result.outputDirectory).toContain('batchgrade-output-')
     expect(rmSyncMock).not.toHaveBeenCalled()
+    expect(spawnMock.mock.calls[0][1]).toEqual(
+      expect.arrayContaining(['--network', 'none', '--cap-drop', 'ALL', '-i', 'gcc:14'])
+    )
   })
 
   it('Should clean execution output directories on process exit', async () => {

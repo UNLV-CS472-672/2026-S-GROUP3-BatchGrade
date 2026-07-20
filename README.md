@@ -44,7 +44,7 @@ For normal use, download the latest release instead of building the project from
 
 You do not need to install Node.js, npm, or clone the repository when using a release.
 
-If you want to use Docker-based grading, install Docker Desktop and keep it running in the background while using BatchGrade. See [Docker-Based Grading](#docker-based-grading) for details.
+Grading requires Docker Desktop or Docker Engine to be installed and running. See [Docker-Based Grading](#docker-based-grading) for details.
 
 Use the setup and build instructions below only if you are developing the project or need to build a local version from the repository.
 
@@ -78,6 +78,7 @@ If you do install the VSCode extension, add the following lines to your settings
 
 - Required Node.js: >= 22
 - Tested with Node.js: 22.22.0
+- Docker Desktop or Docker Engine (required for compiling and grading submissions)
 
 If you encounter native build issues (for example with `better-sqlite3` or other native modules), switch to a Node.js version compatible with the Electron binary in `devDependencies` or rebuild native modules after switching versions.
 
@@ -89,7 +90,7 @@ npm install
 
 If needed, install Node.js for your appropriate Operating System from here: <https://nodejs.org/en/download>
 
-To use Docker, install Docker Desktop from here: <https://www.docker.com/get-started/>
+Install Docker Desktop from here: <https://www.docker.com/get-started/>
 
 Note: Docker should be open and running, alongside BatchGrade.
 
@@ -158,11 +159,11 @@ Use `npm run clean` to remove `dist/`, `out/`, and `node_modules/`.
 
 ## Docker-Based Grading
 
-BatchGrade can compile and run submitted code inside Docker containers. Make sure Docker Desktop or Docker Engine is installed and running before using the Docker grading workflow.
+BatchGrade compiles and runs submitted code exclusively inside Docker containers. Docker Desktop or Docker Engine must be installed and running before grading submissions.
 
 Docker-based grading helps run submissions in a more consistent, isolated environment, which reduces differences between instructor machines and helps keep student code separated from the host system.
 
-If you want to use Docker-based grading, download and install Docker Desktop from <https://www.docker.com/get-started/> before running BatchGrade. Docker Desktop must stay open and running in the background while Docker-based grading is being used.
+Download and install Docker Desktop from <https://www.docker.com/get-started/> before running BatchGrade. Docker Desktop must stay open and running while submissions are compiled or graded.
 
 The current Docker compiler images are:
 
@@ -222,7 +223,7 @@ Organize Vitest tests into folders that match the structure of the source code:
 ```
 tests/
 ├── compiler/
-│   ├── compileCppFiles.test.ts
+│   ├── dockerCompile.test.ts
 │   └── ...
 ├── database/
 │   ├── assignment.test.ts

@@ -5,24 +5,12 @@
     - Currently focused on C++
 */
 
+import type { DockerJudgeRequest, DockerJudgeResult } from '../../shared/compiler'
 import type { Language } from './languages'
 import { dockerExecute } from './dockerExecute'
 
-// This is used when requesting a program to be judged.
-interface DockerJudgeRequest {
-  executablePath: string
-  stdin: string
-  expectedOutput: string
-  timeoutMs: number
+type DockerJudgeOptions = DockerJudgeRequest & {
   language: Language
-}
-
-// This is the result of a program judging request.
-interface DockerJudgeResult {
-  passed: boolean
-  timedOut: boolean
-  expectedOutput: string
-  actualOutput: string
 }
 
 // Helper function to clean and normalize output for comparison
@@ -35,7 +23,7 @@ async function cleanOutput(output: string): Promise<string> {
  * @param request - The judging request containing the executable path, stdin, expected output, timeout, and language.
  * @returns A promise that resolves to the judging result.
  */
-async function dockerJudge(request: DockerJudgeRequest): Promise<DockerJudgeResult> {
+async function dockerJudge(request: DockerJudgeOptions): Promise<DockerJudgeResult> {
   const { executablePath, stdin, expectedOutput, timeoutMs, language } = request
 
   // Execute the program

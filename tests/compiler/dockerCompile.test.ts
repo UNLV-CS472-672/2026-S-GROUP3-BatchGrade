@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const { spawnMock, rmSyncMock, mkdtempMock, getCommonWorkingDirectoryMock } = vi.hoisted(() => {
   return {
@@ -52,6 +52,7 @@ function restorePlatform(): void {
 }
 
 beforeEach(() => {
+  vi.spyOn(process, 'once').mockImplementation(() => process)
   vi.doUnmock('../../src/main/compiler/languages')
   spawnMock.mockReset()
   rmSyncMock.mockReset()
@@ -60,6 +61,10 @@ beforeEach(() => {
 
   mkdtempMock.mockResolvedValue('/tmp/batchgrade-docker-123')
   getCommonWorkingDirectoryMock.mockReturnValue('/project')
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('dockerCompile', () => {
@@ -107,9 +112,23 @@ describe('dockerCompile', () => {
     })
 
     expect(result.success).toBe(true)
+    expect(result.compileSuccess).toBe(true)
+    expect(result.compilerPath).toBe('docker')
     expect(result.executablePath).toContain('batchgrade-docker-')
     expect(result.message).toBe('Compilation success.')
     expect(rmSyncMock).not.toHaveBeenCalled()
+    expect(spawnMock.mock.calls[0][1]).toEqual(
+      expect.arrayContaining([
+        '--network',
+        'none',
+        '--cap-drop',
+        'ALL',
+        'gcc:14',
+        'g++',
+        'main.cpp',
+        'utils.cpp'
+      ])
+    )
     if (typeof process.getuid === 'function' && typeof process.getgid === 'function') {
       expect(spawnMock).toHaveBeenCalledWith(
         'docker',
@@ -219,7 +238,10 @@ describe('dockerCompile', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(spawnMock).toHaveBeenCalled()
+    const dockerArgs = spawnMock.mock.calls[0][1]
+    expect(dockerArgs).toContain('main.cpp')
+    expect(dockerArgs).not.toContain('header.h')
+    expect(dockerArgs).not.toContain('readme.txt')
   })
 
   it('Should compile non-C++ files using language extensions', async () => {
